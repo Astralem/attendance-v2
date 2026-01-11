@@ -1,20 +1,23 @@
 from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QMainWindow, QStackedWidget
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from attendance import record_attendance, add_student
+from attendance import record_attendance, add_student, remove_student, clear_attendance
 import re
 
 class ScanWindow(QWidget):
-    def __init__(self, go_next):
+    def __init__(self, go_next, go_next2):
         super().__init__()
-        self.title = QLabel("📋 Yeah")
+        self.title = QLabel("📋 Attendance System")
         self.subtitle = QLabel("Scan your barcode to time in")
         self.input = QLineEdit()
         self.result = QLabel("Waiting for scan...")
         self.addStudentsbtn = QPushButton('Add a student')
+        self.removeStudentbtn = QPushButton('Remove a student')
+        self.clearAttendance = QPushButton('Clear Attendance')
         self.card = QFrame()
         self.initUI_scan()
         self.go_next = go_next
+        self.go_next2 = go_next2
         
     def initUI_scan(self):
         self.title.setAlignment(Qt.AlignCenter)
@@ -30,7 +33,9 @@ class ScanWindow(QWidget):
 
         self.result.setAlignment(Qt.AlignCenter)
 
-        self.addStudentsbtn.clicked.connect(self.on_click_next)
+        self.addStudentsbtn.clicked.connect(self.on_click_add)
+        self.removeStudentbtn.clicked.connect(self.on_click_remove)
+        self.clearAttendance.clicked.connect(self.on_click_clear)
 
         self.card.setStyleSheet("""
             QFrame {
@@ -48,6 +53,10 @@ class ScanWindow(QWidget):
         card_layout.addWidget(self.input)
         card_layout.addWidget(self.result)
         card_layout.addWidget(self.addStudentsbtn)
+        card_layout.addSpacing(5)
+        card_layout.addWidget(self.removeStudentbtn)
+        card_layout.addSpacing(5)
+        card_layout.addWidget(self.clearAttendance)
 
         layout = QVBoxLayout()
         layout.addStretch()
@@ -77,8 +86,16 @@ class ScanWindow(QWidget):
                 background-color: #357ABD;
             }
         """)
-    def on_click_next(self):
+    def on_click_add(self):
         self.go_next()
+
+    def on_click_remove(self):
+        self.go_next2()
+    
+    def on_click_clear(self):
+        clear_attendance()
+        self.result.setText('Attendance cleared!')
+        self.result.setStyleSheet('color: green;')
 
     def scan_id(self):
         student_id = self.input.text().strip()
@@ -197,10 +214,88 @@ class addStudent(QWidget):
             self.res.setStyleSheet('color: green;')
             self.input_ID.clear()
             self.input_name.clear()
-        
 
+class removeWindow(QWidget):
+    def __init__(self, go_back):
+        super().__init__()
+        self.back = QPushButton('Go back')
+        self.title = QLabel('Remove Student')
+        self.input = QLineEdit()
+        self.res = QLabel('Waiting...')
+        self.card = QFrame()
+        self.go_back = go_back
+        self.initUI_remove()
 
+    def initUI_remove(self):
+        self.back.setStyleSheet("""
+             QPushButton {
+                background-color: red;
+                color: white;
+                padding: 6px 14px;
+                border-radius: 6px;
+                font-size: 13px;
+            }
+            QPushButton:hover {
+                background-color: #357ABD;     
+            }  
+        """)
+        self.back.clicked.connect(self.on_click_back)
 
+        self.title.setAlignment(Qt.AlignCenter)
+        self.title.setFont(QFont("Segoe UI", 16, QFont.Bold))
+
+        self.input.setPlaceholderText('Student ID')
+        self.input.setAlignment(Qt.AlignCenter)
+        self.input.setFont(QFont("Segoe UI", 12))
+        self.input.returnPressed.connect(self.remove_student_func)
+
+        self.res.setAlignment(Qt.AlignCenter)
+
+        self.card.setStyleSheet("""
+            QFrame {
+                background: white;
+                border-radius: 12px;
+                padding: 20px;
+            }       
+        """)
+        top_layout = QHBoxLayout()
+        top_layout.addWidget(self.back)
+        top_layout.addStretch()
+
+        card_layout = QVBoxLayout(self.card)
+        card_layout.setSpacing(14)
+        card_layout.addWidget(self.title)
+        card_layout.setSpacing(10)
+        card_layout.addWidget(self.input)
+        card_layout.setSpacing(10)
+        card_layout.addWidget(self.res)
+
+        layout = QVBoxLayout()
+        layout.addLayout(top_layout)
+        layout.addStretch()
+        layout.addWidget(self.card)
+        layout.addStretch()
+
+        self.setLayout(layout)
+
+    def on_click_back(self):
+        self.go_back()
+
+    def remove_student_func(self):
+        student_id = self.input.text().strip()
+
+        if not student_id.isdigit():
+            self.res.setText('❌ Invalid ID')
+            self.res.setStyleSheet('color: red;')
+            self.input.clear()
+            return
+        else:
+            remove_student(int(student_id))
+            self.res.setText('Succesfully removed student! ')
+            self.res.setStyleSheet('color: green;')
+            self.input.clear()
+            
+         
 class mainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -209,14 +304,19 @@ class mainWindow(QMainWindow):
         self.stack = QStackedWidget()
         self.setCentralWidget(self.stack)
 
-        self.ScanWindow = ScanWindow(self.go_next)
+        self.ScanWindow = ScanWindow(self.go_next, self.go_next2)
         self.addStudent = addStudent(self.go_back)
+        self.removeStudent = removeWindow(self.go_back)
 
         self.stack.addWidget(self.ScanWindow)
         self.stack.addWidget(self.addStudent)
+        self.stack.addWidget(self.removeStudent)
 
     def go_next(self):
         self.stack.setCurrentIndex(1)
+
+    def go_next2(self):
+        self.stack.setCurrentIndex(2)
 
     def go_back(self):
         self.stack.setCurrentIndex(0)
