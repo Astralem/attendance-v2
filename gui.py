@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QMainWindow, QStackedWidget
+from PyQt5.QtWidgets import QWidget, QLabel, QLineEdit, QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QMainWindow, QStackedWidget, QButtonGroup
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from attendance import record_attendance, add_student, remove_student, clear_attendance
@@ -13,6 +13,11 @@ class ScanWindow(QWidget):
         self.result = QLabel("Waiting for scan...")
         self.clearAttendance = QPushButton('Clear Attendance')
         self.otherOptions = QPushButton('Other Options')
+        self.current_gradelevel = 12
+        self.grade11_btn = QPushButton('Grade 11')
+        self.grade12_btn = QPushButton('Grade 12')
+        self.grade_group = QButtonGroup(self)
+        self.grade_group.setExclusive(True)
         self.card = QFrame()
         self.initUI_scan()
         self.go_next = go_next
@@ -33,6 +38,12 @@ class ScanWindow(QWidget):
 
         self.result.setAlignment(Qt.AlignCenter)
 
+        self.grade_group.addButton(self.grade11_btn, 11)
+        self.grade_group.addButton(self.grade12_btn, 12)
+        self.grade11_btn.setCheckable(True) 
+        self.grade12_btn.setCheckable(True)
+        self.grade12_btn.setChecked(True)   
+        self.grade_group.buttonClicked[int].connect(self.setGrade)
         self.clearAttendance.clicked.connect(self.on_click_clear)
         self.otherOptions.clicked.connect(self.on_click_other)
 
@@ -43,6 +54,10 @@ class ScanWindow(QWidget):
                 padding: 20px;
             }
         """)
+        top_layout = QHBoxLayout()
+        top_layout.addStretch()
+        top_layout.addWidget(self.grade11_btn)
+        top_layout.addWidget(self.grade12_btn)
 
         card_layout = QVBoxLayout(self.card)
         card_layout.setSpacing(12)
@@ -54,8 +69,9 @@ class ScanWindow(QWidget):
         card_layout.addSpacing(5)
         card_layout.addWidget(self.clearAttendance)
         card_layout.addWidget(self.otherOptions)
-
+        
         layout = QVBoxLayout()
+        layout.addLayout(top_layout)
         layout.addStretch()
         layout.addWidget(self.card)
         layout.addStretch()
@@ -84,6 +100,10 @@ class ScanWindow(QWidget):
             }
         """)
 
+    def setGrade(self, grade):
+        self.current_gradelevel = grade
+
+
     def on_click_other(self):
         self.go_other()
     
@@ -94,6 +114,7 @@ class ScanWindow(QWidget):
 
     def scan_id(self):
         student_id = self.input.text().strip()
+        grade = self.current_gradelevel
 
         if not student_id.isdigit():
             self.result.setText("❌ Invalid ID")
@@ -101,7 +122,7 @@ class ScanWindow(QWidget):
             self.input.clear()
             return
 
-        message = record_attendance(int(student_id))
+        message = record_attendance(int(student_id), int(grade))
         self.result.setText("✅ " + message)
         self.result.setStyleSheet("color: green;")
         self.input.clear()
@@ -113,6 +134,7 @@ class addStudent(QWidget):
         self.title = QLabel('Add a Student')
         self.input_name = QLineEdit()
         self.input_ID = QLineEdit()
+        self.input_gradelevel = QLineEdit()
         self.res = QLabel('Waiting for scan...')
         self.card = QFrame()
         self.initUI_add()
@@ -147,6 +169,11 @@ class addStudent(QWidget):
         self.input_ID.setFont(QFont("Segoe UI", 12))
         self.input_ID.returnPressed.connect(self.add_student_func)
 
+        self.input_gradelevel.setPlaceholderText("Student Grade Level")
+        self.input_gradelevel.setAlignment(Qt.AlignCenter)
+        self.input_gradelevel.setFont(QFont("Segoe UI", 12))
+        self.input_gradelevel.returnPressed.connect(self.add_student_func)
+
         self.res.setAlignment(Qt.AlignCenter)
 
         self.card.setStyleSheet("""
@@ -167,6 +194,8 @@ class addStudent(QWidget):
         card_layout.addWidget(self.input_name)
         card_layout.setSpacing(6)
         card_layout.addWidget(self.input_ID)
+        card_layout.setSpacing(6)
+        card_layout.addWidget(self.input_gradelevel)
         card_layout.setSpacing(10)
         card_layout.addWidget(self.res)
 
@@ -191,6 +220,7 @@ class addStudent(QWidget):
     def add_student_func(self):
         student_id = self.input_ID.text().strip()
         student_name = self.input_name.text().strip()
+        student_gradelevel = self.input_gradelevel.text().strip()
 
         if not student_id.isdigit() and not self.is_valid_name(student_name):
             self.res.setText('❌ Invalid ID and Invalid Student Name')
@@ -208,11 +238,12 @@ class addStudent(QWidget):
             self.input_ID.clear()  
             return
         else:
-            add_student(int(student_id), student_name)
+            add_student(int(student_id), student_name, int(student_gradelevel))
             self.res.setText('Added student successfully!')
             self.res.setStyleSheet('color: green;')
             self.input_ID.clear()
             self.input_name.clear()
+            self.input_gradelevel.clear()
 
 class removeWindow(QWidget):
     def __init__(self, go_back):
