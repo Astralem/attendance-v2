@@ -75,13 +75,7 @@ def add_student(student_id, student_name, grade_level):
     conn.commit()
     conn.close()
 
-def time_in_or_out(student_id, grade_level, status):
-    if status == "TIME IN":
-        time_out(student_id, grade_level)
-    elif status == "TIME OUT":
-        record_attendance(student_id, grade_level)
-
-def time_out(student_id, grade_level):
+def time_in_or_out(student_id, grade_level):
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -104,23 +98,52 @@ def time_out(student_id, grade_level):
     
     table = get_gradelevel(grade_level)
 
-    cursor.execute(
-        f"SELECT time_out FROM {table} WHERE student_id = ?",
+    cursor.execute(f"SELECT time_in, time_out FROM {table} where student_id = ?",
         (student_id,)
     )
-    already_present = cursor.fetchone()
+    recorded = cursor.fetchone()
 
-    if already_present and already_present[0]:
+    if not recorded:
+        return "Student not found in database"
+    
+    time_in1, time_out1 = recorded
+
+    if not time_in1:
         conn.close()
-        return f"{student[0]} already timed out"
+        return record_attendance(student_id, grade_level)
+    elif not time_out1:
+        conn.close()
+        return time_out(student_id, grade_level)
+    else:
+        conn.close()
+        return "Student already timed in and out"
 
-    time_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def time_out(student_id, grade_level):
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+    f"SELECT time_out FROM {table} WHERE student_id = ?",
+    (student_id,)
+)
+    if cursor.fetchone()[0]:
+        conn.close()
+        return "Already timed out"
+
+    cursor.execute(
+        "SELECT student_names, grade_level FROM students WHERE student_id = ?",
+        (student_id,)
+    )
+    student = cursor.fetchone()
+
+    time_out = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    table = get_gradelevel(grade_level)
 
     cursor.execute(f"""
         UPDATE {table}
         SET time_out = ?
         WHERE student_id = ?
-    """, (time_in, student_id))
+    """, (time_out, student_id))
 
     conn.commit()
     conn.close()
@@ -137,31 +160,8 @@ def record_attendance(student_id, grade_level):
         (student_id,)
     )
     student = cursor.fetchone()
-
-    if not student:
-        conn.close()
-        return "Unregistered ID"
-    
-    name = student[0]
-    gradeLevel = student[1]
-
-    if gradeLevel != grade_level:
-        conn.close()
-        return f"{name} is not in {gradeLevel}"
-    
-    table = get_gradelevel(grade_level)
-
-    cursor.execute(
-        f"SELECT time_in FROM {table} WHERE student_id = ?",
-        (student_id,)
-    )
-    already_present = cursor.fetchone()
-
-    if already_present and already_present[0]:
-        conn.close()
-        return f"{student[0]} already timed in"
-
     time_in = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    table = get_gradelevel(grade_level)
 
     cursor.execute(f"""
         UPDATE {table}
@@ -197,7 +197,7 @@ def clear_attendance(grade_level):
     table = get_gradelevel(grade_level)
     cursor.execute(f"""
         UPDATE {table}
-        SET time_in = NULL , status = NULL
+        SET time_in = NULL, time_out = NULL , status = NULL
     """)
 
     conn.commit()
